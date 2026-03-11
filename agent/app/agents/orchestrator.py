@@ -35,7 +35,7 @@ def build_orchestrator(
 
     return Agent(
         name="OrchestratorAgent",
-        model=OpenRouter(id="google/gemini-2.5-flash-lite"),
+        model=OpenRouter(id="google/gemini-3.1-flash-lite-preview"),
         # Agno SQLite-backed session state — persists across turns in the same session
         db=SqliteDb(db_file=str(_DB_FILE)),
         session_id=session_id,
@@ -46,7 +46,7 @@ def build_orchestrator(
         # Initial state (populated only on first turn; subsequent turns load from DB)
         # Note: we shouldn't pass session_state here if we want to load from DB, or we must ensure it doesn't overwrite.
         # Agno's `session_state` gets merged or overwritten. We will let the tools populate it.
-        add_session_state_to_context=True,
+        add_session_state_to_context=False,
         skills=Skills(loaders=[LocalSkills(str(skills_dir))]),
         tools=[
             BankingToolkit(client),

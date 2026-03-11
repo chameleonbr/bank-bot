@@ -19,6 +19,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/backend"
             },
+            "envFile": "${workspaceFolder}/backend/.env",
             "jinja": true,
             "justMyCode": false
         },
@@ -40,6 +41,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/agent"
             },
+            "envFile": "${workspaceFolder}/agent/.env",
             "jinja": true,
             "justMyCode": false
         }

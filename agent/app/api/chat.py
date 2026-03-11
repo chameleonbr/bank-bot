@@ -32,6 +32,7 @@ class ChatResponse(BaseModel):
     message: str
     account_id: str
     files: list[FileResponse] = []
+    tools_called: list[str] = []
 
 
 @router.post("", response_model=ChatResponse)
@@ -59,37 +60,14 @@ async def chat(
     )
 
     try:
-        # Explicitly load session_state since it might not be auto-loaded
-        try:
-            db_state = agent.get_session_data()
-            if db_state:
-                agent.session_state = db_state
-        except Exception:
-            pass # Fresh session, DB record not created yet
-        
-        # Initialize default state variables if this is a new session
-        if agent.session_state is None:
-            agent.session_state = {}
-        if "account_id" not in agent.session_state:
-            agent.session_state["account_id"] = account_id
-        if "pending_operation" not in agent.session_state:
-            agent.session_state["pending_operation"] = None
-        if "last_query" not in agent.session_state:
-            agent.session_state["last_query"] = None
-        if "files" not in agent.session_state:
-            agent.session_state["files"] = []
-
         response = await agent.arun(payload.message)
         answer = response.content if hasattr(response, "content") else str(response)
         
         # Extract and clear files from session state
-        files_to_send = agent.session_state.get("files", [])
+        files_to_send = response.session_state.get("files", [])
+        tools_called = [tool.tool_name for tool in response.tools]
 
-        # debug session state
-        print("Session state:", agent.session_state)
-        print("agent")
-
-        #agent.session_state["files"] = []
+        response.session_state["files"] = []
         
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Agent error: {str(exc)}")
@@ -103,7 +81,8 @@ async def chat(
         session_id=session_id,
         message=answer,
         account_id=account_id,
-        files=files_to_send
+        files=files_to_send,
+        tools_called=tools_called
     )
 
 
