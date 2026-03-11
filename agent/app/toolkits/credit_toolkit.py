@@ -19,18 +19,18 @@ class CreditToolkit(Toolkit):
         self.register(self.get_credit_score)
 
     async def get_credit_limit(self) -> dict:
-        """Retorna limite de crédito disponível e utilizado."""
+        """Returns the available and utilized credit limit."""
         return await self.client.get_credit_limit()
 
-    async def simulate_loan(self, amount: float, num_installments: int, loan_type: str = "pessoal") -> dict:
-        """Simula empréstimo: parcelas, taxa mensal, taxa anual e CET."""
+    async def simulate_loan(self, amount: float, num_installments: int, loan_type: str = "personal") -> dict:
+        """Simulates a loan: installments, monthly rate, annual rate, and total effective cost (CET)."""
         return await self.client.simulate_loan({"amount": amount, "num_installments": num_installments, "loan_type": loan_type})
 
-    async def request_loan(self, run_context: RunContext, amount: float, num_installments: int, loan_type: str = "pessoal", purpose: str = "") -> str:
+    async def request_loan(self, run_context: RunContext, amount: float, num_installments: int, loan_type: str = "personal", purpose: str = "") -> str:
         """
-        Inicia solicitação de empréstimo.
-        Se a operação já estiver confirmada no pending_operation, ela é executada.
-        Caso contrário, salva os dados na sessão e pede confirmação ao usuário.
+        Initiates a loan request.
+        If the operation is already confirmed in pending_operation, it is executed.
+        Otherwise, it saves the data in the session and asks the user for confirmation.
         """
         state = run_context.session_state
         pending = state.get("pending_operation")
@@ -43,7 +43,7 @@ class CreditToolkit(Toolkit):
                 "purpose": pending.get("purpose")
             })
             state["pending_operation"] = None
-            return f"Empréstimo solicitado com sucesso: {result}"
+            return f"Loan requested successfully: {result}"
 
         state["pending_operation"] = {
             "type": "loan_request",
@@ -53,25 +53,25 @@ class CreditToolkit(Toolkit):
             "purpose": purpose,
             "status": "pending_confirmation"
         }
-        return (f"Solicitação de empréstimo {loan_type} preparada. Valor: R$ {amount:.2f} em {num_installments} parcelas. "
-                f"Por favor, peça ao usuário para confirmar a solicitação.")
+        return (f"{loan_type.capitalize()} loan request prepared. Amount: R$ {amount:.2f} in {num_installments} installments. "
+                f"Please ask the user to confirm the request.")
 
     async def get_loan_status(self, loan_id: str) -> dict:
-        """Verifica status de solicitação de empréstimo em andamento."""
+        """Checks the status of an ongoing loan request."""
         return await self.client.get_loan_status(loan_id)
 
     async def list_active_loans(self) -> list:
-        """Lista empréstimos ativos com saldo devedor."""
+        """Lists active loans with outstanding balance."""
         return await self.client.list_active_loans()
 
     async def get_loan_statement(self, loan_id: str) -> dict:
-        """Histórico de pagamentos de um empréstimo."""
+        """Payment history of a loan."""
         return await self.client.get_loan_statement(loan_id)
 
     async def anticipate_installments(self, loan_id: str, num_installments_to_anticipate: int) -> dict:
-        """Simula e solicita antecipação de parcelas com desconto."""
+        """Simulates and requests installment anticipation with a discount."""
         return await self.client.anticipate_installments({"loan_id": loan_id, "num_installments_to_anticipate": num_installments_to_anticipate})
 
     async def get_credit_score(self) -> dict:
-        """Retorna score de crédito interno do cliente."""
+        """Returns the client's internal credit score."""
         return await self.client.get_credit_score()

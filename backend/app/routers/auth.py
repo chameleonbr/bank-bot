@@ -16,7 +16,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(payload.pin, user.pin_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="account_id ou PIN inválidos",
+            detail="Invalid account_id or PIN",
         )
     token = create_access_token(
         data={"sub": user.id, "user_id": user.id, "account_id": payload.account_id}
@@ -37,7 +37,7 @@ def refresh(
     account_id = current_user.get("account_id")
     user = db.query(User).filter(User.account_id == account_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        raise HTTPException(status_code=404, detail="User not found")
     token = create_access_token(
         data={"sub": user.id, "user_id": user.id, "account_id": account_id}
     )

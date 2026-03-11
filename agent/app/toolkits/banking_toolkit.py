@@ -1,6 +1,7 @@
 """BankingToolkit — tools for account balance, statement, contacts and scheduled operations."""
 
 from agno.tools import Toolkit
+from agno.run import RunContext
 from app.client.backend_client import BackendClient
 
 
@@ -16,13 +17,14 @@ class BankingToolkit(Toolkit):
         self.register(self.remove_contact)
         self.register(self.get_scheduled)
         self.register(self.cancel_scheduled)
+        self.register(self.generate_statement_pdf)
 
     async def get_balance(self) -> dict:
-        """Retorna saldo disponível, bloqueado e total da conta do usuário autenticado."""
+        """Returns the available, blocked, and total balance for the authenticated account."""
         return await self.client.get_balance()
 
     async def get_statement(self, start_date: str = "", end_date: str = "", category: str = "", limit: int = 20) -> dict:
-        """Busca extrato por período com filtros opcionais de categoria."""
+        """Fetches the account statement by period with optional category filters."""
         params = {}
         if start_date: params["start_date"] = start_date
         if end_date: params["end_date"] = end_date
@@ -31,28 +33,45 @@ class BankingToolkit(Toolkit):
         return await self.client.get_statement(**params)
 
     async def get_account_info(self) -> dict:
-        """Retorna dados cadastrais e informações da conta."""
+        """Returns registration and account details."""
         return await self.client.get_account_info()
 
     async def list_contacts(self, search_term: str = "") -> list:
-        """Lista contatos salvos para transferência. Use search_term para filtrar por nome."""
+        """Lists saved contacts for transfers. Use search_term to filter by name."""
         return await self.client.list_contacts(search=search_term or None)
 
     async def add_contact(self, name: str, cpf_cnpj: str, bank: str = "", agency: str = "", account_number: str = "", pix_key: str = "") -> dict:
-        """Adiciona novo contato à agenda bancária."""
+        """Adds a new contact to the banking agenda."""
         return await self.client.add_contact({"name": name, "cpf_cnpj": cpf_cnpj, "bank": bank, "agency": agency, "account_number": account_number, "pix_key": pix_key})
 
     async def remove_contact(self, contact_id: str) -> dict:
-        """Remove contato da agenda bancária pelo contact_id."""
+        """Removes a contact from the banking agenda by contact_id."""
         return await self.client.remove_contact(contact_id)
 
     async def get_scheduled(self, date_from: str = "", date_to: str = "") -> list:
-        """Lista transferências e pagamentos agendados."""
+        """Lists scheduled transfers and payments."""
         params = {}
         if date_from: params["date_from"] = date_from
         if date_to: params["date_to"] = date_to
         return await self.client.get_scheduled(**params)
 
     async def cancel_scheduled(self, schedule_id: str) -> dict:
-        """Cancela uma operação agendada pelo schedule_id."""
+        """Cancels a scheduled operation by schedule_id."""
         return await self.client.cancel_scheduled(schedule_id)
+
+    async def generate_statement_pdf(self, run_context: RunContext, start_date: str = "", end_date: str = "") -> str:
+        """Generates a PDF statement for the period and attaches it to the response."""
+        try:
+            file_data = await self.client.generate_statement_pdf(start_date, end_date)
+            # Add to agent session state so chat API can extract it
+            if "files" not in run_context.session_state:
+                run_context.session_state["files"] = []
+            
+            run_context.session_state["files"].append({
+                "content_type": file_data.get("content_type", "application/pdf"),
+                "content": file_data.get("content"),
+                "filename": file_data.get("filename", "statement.pdf")
+            })
+            return f"Statement PDF for period {start_date} to {end_date} generated successfully."
+        except Exception as e:
+            return f"Error generating PDF: {str(e)}"

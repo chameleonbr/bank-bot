@@ -18,36 +18,36 @@ class InvestmentToolkit(Toolkit):
         self.register(self.get_income_report)
 
     async def get_portfolio(self) -> dict:
-        """Retorna posição completa da carteira de investimentos."""
+        """Returns the full position of the investment portfolio."""
         return await self.client.get_portfolio()
 
     async def get_product_info(self, product_id: str) -> dict:
-        """Detalha um produto de investimento específico pelo product_id."""
+        """Details a specific investment product by product_id."""
         return await self.client.get_product_info(product_id)
 
     async def list_available_products(self, risk_profile: str = "", min_amount: float = 0) -> list:
-        """Lista produtos de investimento disponíveis filtrando por perfil e valor mínimo."""
+        """Lists available investment products filtering by profile and minimum amount."""
         params = {}
         if risk_profile: params["risk_profile"] = risk_profile
         if min_amount: params["min_amount"] = min_amount
         return await self.client.list_available_products(**params)
 
     async def simulate_investment(self, product_id: str, amount: float, period_days: int) -> dict:
-        """Simula rentabilidade de um investimento com cálculo de IR e rendimento líquido."""
+        """Simulates the profitability of an investment with calculation of income tax and net return."""
         return await self.client.simulate_investment({"product_id": product_id, "amount": amount, "period_days": period_days})
 
     async def invest(self, product_id: str, amount: float) -> dict:
-        """Executa aplicação em produto de investimento."""
+        """Executes an investment in a specific product."""
         return await self.client.invest(product_id, amount)
 
     async def redeem(self, investment_id: str, amount: float = 0) -> dict:
-        """Solicita resgate de investimento. Se amount=0, resgata o total."""
+        """Requests investment redemption. If amount=0, redeems the total."""
         return await self.client.redeem(investment_id, amount or None)
 
     async def get_investor_profile(self) -> dict:
-        """Retorna perfil de investidor: conservador, moderado ou arrojado."""
+        """Returns investor profile: conservative, moderate, or aggressive."""
         return await self.client.get_investor_profile()
 
     async def get_income_report(self, year: int) -> dict:
-        """Gera relatório de rendimentos por ano para declaração de IR."""
+        """Generates income report by year for tax declaration."""
         return await self.client.get_income_report(year)

@@ -46,6 +46,8 @@ class BackendClient:
     async def remove_contact(self, contact_id: str): return await self._delete(f"/banking/contacts/{contact_id}")
     async def get_scheduled(self, **params): return await self._get("/banking/scheduled", params)
     async def cancel_scheduled(self, schedule_id: str): return await self._delete(f"/banking/scheduled/{schedule_id}")
+    async def generate_statement_pdf(self, start_date: str = "", end_date: str = ""): 
+        return await self._get("/banking/generate-statement-pdf", {"start_date": start_date, "end_date": end_date})
 
     # ── PIX ───────────────────────────────────────────────────────────────────
     async def validate_pix_key(self, pix_key: str): return await self._get("/pix/validate", {"pix_key": pix_key})

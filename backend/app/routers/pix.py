@@ -34,7 +34,7 @@ _PIX_DIRECTORY = {
 def _get_account(account_id: str, db: Session) -> Account:
     acc = db.get(Account, account_id)
     if not acc:
-        raise HTTPException(status_code=404, detail="Conta não encontrada")
+        raise HTTPException(status_code=404, detail="Account not found")
     return acc
 
 
@@ -55,19 +55,19 @@ def pix_transfer(
 ):
     acc = _get_account(current_user["account_id"], db)
     if acc.balance_checking < payload.amount:
-        raise HTTPException(status_code=422, detail="Saldo insuficiente")
+        raise HTTPException(status_code=422, detail="Insufficient balance")
     # Simulated 5% failure rate
     if random.random() < 0.05:
-        raise HTTPException(status_code=503, detail="Falha na transação PIX. Tente novamente.")
+        raise HTTPException(status_code=503, detail="PIX transaction failure. Try again.")
     acc.balance_checking -= payload.amount
     recipient = _PIX_DIRECTORY.get(payload.pix_key, {})
     txn_id = f"TRX{uuid.uuid4().hex[:8].upper()}"
     db.add(Transaction(
         id=txn_id,
         account_id=acc.id,
-        description=f"PIX enviado - {recipient.get('holder_name', payload.pix_key)}",
+        description=f"PIX sent - {recipient.get('holder_name', payload.pix_key)}",
         amount=-payload.amount,
-        category="transferencia",
+        category="transfer",
         type="pix",
         counterpart_name=recipient.get("holder_name", ""),
         counterpart_key=payload.pix_key,
@@ -75,7 +75,7 @@ def pix_transfer(
         status="completed",
     ))
     db.commit()
-    return TransferResponse(transaction_id=txn_id, status="completed", message="PIX enviado com sucesso!", timestamp=datetime.now(timezone.utc))
+    return TransferResponse(transaction_id=txn_id, status="completed", message="PIX sent successfully!", timestamp=datetime.now(timezone.utc))
 
 
 @router.post("/schedule", status_code=201)
@@ -97,7 +97,7 @@ def pix_schedule(
     )
     db.add(op)
     db.commit()
-    return {"schedule_id": op.id, "status": "scheduled", "message": "PIX agendado com sucesso!"}
+    return {"schedule_id": op.id, "status": "scheduled", "message": "PIX scheduled successfully!"}
 
 
 @router.get("/keys", response_model=list[PixKeyOut])
@@ -140,7 +140,7 @@ def delete_pix_key(
         PixKey.account_id == current_user["account_id"],
     ).first()
     if not key:
-        raise HTTPException(status_code=404, detail="Chave PIX não encontrada")
+        raise HTTPException(status_code=404, detail="PIX key not found")
     key.status = "deleted"
     db.commit()
 
@@ -149,7 +149,7 @@ def delete_pix_key(
 def get_pix_limits(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     limits = db.get(PixLimit, current_user["account_id"])
     if not limits:
-        raise HTTPException(status_code=404, detail="Limites não configurados")
+        raise HTTPException(status_code=404, detail="Limits not configured")
     return PixLimitOut(account_id=limits.account_id, limit_daytime=limits.limit_daytime, limit_nighttime=limits.limit_nighttime)
 
 
@@ -159,9 +159,10 @@ def update_pix_limit(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Updates the PIX limits for the user."""
     limits = db.get(PixLimit, current_user["account_id"])
     if not limits:
-        raise HTTPException(status_code=404, detail="Limites não encontrados")
+        raise HTTPException(status_code=404, detail="Limits not found")
     limits.limit_daytime = payload.new_limit_daytime
     limits.limit_nighttime = payload.new_limit_nighttime
     db.commit()
@@ -180,7 +181,7 @@ def get_pix_receipt(
         Transaction.type == "pix",
     ).first()
     if not txn:
-        raise HTTPException(status_code=404, detail="Comprovante não encontrado")
+        raise HTTPException(status_code=404, detail="Receipt not found")
     acc = db.get(Account, current_user["account_id"])
     return PixReceiptOut(
         transaction_id=txn.id,

@@ -16,25 +16,25 @@ class LoanToolkit(Toolkit):
         self.register(self.request_portability)
 
     async def simulate_financing(self, amount: float, entry_value: float, period_months: int, modality: str, system: str = "SAC") -> dict:
-        """Simula financiamento com tabelas SAC, PRICE ou MISTO. modality: imovel|veiculo|rural."""
+        """Simulates financing with SAC, PRICE, or MIXED tables. modality: real_estate|vehicle|rural."""
         return await self.client.simulate_financing({"amount": amount, "entry_value": entry_value, "period_months": period_months, "modality": modality, "system": system})
 
     async def list_active_financings(self) -> list:
-        """Lista financiamentos ativos do cliente."""
+        """Lists the client's active financings."""
         return await self.client.list_active_financings()
 
     async def request_financing(self, amount: float, entry_value: float, period_months: int, modality: str, system: str = "SAC") -> dict:
-        """Inicia processo de solicitação de financiamento."""
+        """Initiates the financing request process."""
         return await self.client.request_financing({"amount": amount, "entry_value": entry_value, "period_months": period_months, "modality": modality, "system": system})
 
     async def get_financing_statement(self, financing_id: str) -> dict:
-        """Extrato detalhado de financiamento ativo."""
+        """Detailed statement of active financing."""
         return await self.client.get_financing_statement(financing_id)
 
     async def get_next_installment(self, financing_id: str) -> dict:
-        """Informa data e valor da próxima parcela do financiamento."""
+        """Informs the date and amount of the next financing installment."""
         return await self.client.get_next_installment(financing_id)
 
     async def request_portability(self, financing_id: str, target_bank_code: str) -> dict:
-        """Inicia pedido de portabilidade de financiamento para outro banco."""
+        """Initiates financing portability request to another bank."""
         return await self.client.request_portability(financing_id, target_bank_code)

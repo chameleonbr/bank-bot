@@ -17,14 +17,14 @@ class TEDToolkit(Toolkit):
         self.register(self.list_banks)
 
     async def validate_ted_dest(self, bank_code: str, agency: str, account_number: str, cpf_cnpj: str) -> dict:
-        """Valida dados bancários do destinatário TED antes da transferência."""
+        """Validates recipient's bank details before the TED transfer."""
         return await self.client.validate_ted_dest({"bank_code": bank_code, "agency": agency, "account_number": account_number, "cpf_cnpj": cpf_cnpj})
 
     async def ted_transfer(self, run_context: RunContext, bank_code: str, agency: str, account_number: str, cpf_cnpj: str, amount: float) -> str:
         """
-        Prepara ou executa uma TED imediata.
-        Se a operação já estiver confirmada no pending_operation, ela é executada.
-        Caso contrário, salva os dados na sessão e pede confirmação ao usuário.
+        Prepares or executes an immediate TED transfer.
+        If the operation is already confirmed in pending_operation, it is executed.
+        Otherwise, it saves the data in the session and asks the user for confirmation.
         """
         state = run_context.session_state
         pending = state.get("pending_operation")
@@ -38,7 +38,7 @@ class TEDToolkit(Toolkit):
                 "amount": pending.get("amount")
             })
             state["pending_operation"] = None
-            return f"TED realizada com sucesso. Comprovante/Detalhes: {result}"
+            return f"TED performed successfully. Receipt/Details: {result}"
 
         state["pending_operation"] = {
             "type": "ted",
@@ -54,16 +54,16 @@ class TEDToolkit(Toolkit):
             val_result = await self.client.validate_ted_dest({
                 "bank_code": bank_code, "agency": agency, "account_number": account_number, "cpf_cnpj": cpf_cnpj
             })
-            receiver_name = val_result.get("name", "Desconhecido")
-            return (f"Operação TED preparada para {receiver_name} (Banco {bank_code}, Ag {agency}, CC {account_number}). "
-                    f"Valor: R$ {amount:.2f}. Por favor, peça ao usuário para confirmar a operação.")
+            receiver_name = val_result.get("name", "Unknown")
+            return (f"TED operation prepared for {receiver_name} (Bank {bank_code}, Ag {agency}, CC {account_number}). "
+                    f"Amount: R$ {amount:.2f}. Please ask the user to confirm the operation.")
         except Exception:
-            return (f"Operação TED preparada no valor de R$ {amount:.2f}. "
-                    f"Por favor, peça ao usuário para confirmar a operação.")
+            return (f"TED operation prepared in the amount of R$ {amount:.2f}. "
+                    f"Please ask the user to confirm the operation.")
 
     async def ted_schedule(self, run_context: RunContext, bank_code: str, agency: str, account_number: str, cpf_cnpj: str, amount: float, schedule_date: str) -> str:
         """
-        Prepara ou executa agendamento de TED.
+        Prepares or executes TED scheduling.
         """
         state = run_context.session_state
         pending = state.get("pending_operation")
@@ -78,7 +78,7 @@ class TEDToolkit(Toolkit):
                 "schedule_date": pending.get("schedule_date")
             })
             state["pending_operation"] = None
-            return f"Agendamento de TED realizado com sucesso: {result}"
+            return f"TED scheduling performed successfully: {result}"
 
         state["pending_operation"] = {
             "type": "ted_schedule",
@@ -90,17 +90,17 @@ class TEDToolkit(Toolkit):
             "schedule_date": schedule_date,
             "status": "pending_confirmation"
         }
-        return (f"Agendamento de TED preparado para o dia {schedule_date} no valor de R$ {amount:.2f}. "
-                f"Por favor, peça ao usuário para confirmar de forma clara.")
+        return (f"TED scheduling prepared for {schedule_date} in the amount of R$ {amount:.2f}. "
+                f"Please ask the user to confirm clearly.")
 
     async def get_ted_receipt(self, transaction_id: str) -> dict:
-        """Gera comprovante de TED."""
+        """Generates TED receipt."""
         return await self.client.get_ted_receipt(transaction_id)
 
     async def get_ted_limits(self) -> dict:
-        """Retorna limites de TED por período."""
+        """Returns TED limits per period."""
         return await self.client.get_ted_limits()
 
     async def list_banks(self, search_term: str = "") -> list:
-        """Lista bancos disponíveis com código ISPB. Use search_term para filtrar."""
+        """Lists available banks with ISPB code. Use search_term to filter."""
         return await self.client.list_banks(search=search_term or None)

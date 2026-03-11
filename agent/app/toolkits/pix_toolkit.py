@@ -20,32 +20,32 @@ class PIXToolkit(Toolkit):
         self.register(self.get_pix_receipt)
 
     async def validate_pix_key(self, pix_key: str) -> dict:
-        """Valida uma chave PIX e retorna os dados do recebedor."""
+        """Validates a PIX key and returns the receiver's data."""
         try:
             return await self.client.validate_pix_key(pix_key)
         except Exception as e:
-            return {"name": "Destinatário Validação Mockada", "masked_document": "***.***.***-**", "bank": "Banco Mock S.A."}
+            return {"name": "Mocked Validation Receiver", "masked_document": "***.***.***-**", "bank": "Banco Mock S.A."}
 
     async def pix_transfer(self, run_context: RunContext, pix_key: str, amount: float, description: str = "") -> str:
         """
-        Prepara ou executa uma transferência PIX imediata.
-        Se a operação já estiver confirmada no pending_operation, ela é executada.
-        Caso contrário, salva os dados na sessão e pede confirmação ao usuário.
+        Prepares or executes an immediate PIX transfer.
+        If the operation is already confirmed in pending_operation, it is executed.
+        Otherwise, it saves the data in the session and asks the user for confirmation.
         """
         state = run_context.session_state
         pending = state.get("pending_operation")
 
-        # Se já existe uma operação do tipo pix pendente e confirmada
+        # If there is already a pending and confirmed pix type operation
         if pending and pending.get("type") == "pix" and pending.get("status") == "confirmed":
-            # Executa de fato
+            # Execute indeed
             result = await self.client.pix_transfer(
                 pending.get("pix_key"), pending.get("amount"), pending.get("description", "")
             )
-            # Limpa estado
+            # Clear state
             state["pending_operation"] = None
-            return f"Transferência realizada com sucesso: {result}"
+            return f"Transfer completed successfully: {result}"
 
-        # Caso contrário, apenas prepara a operação e salva no estado
+        # Otherwise, just prepares the operation and saves it in the state
         state["pending_operation"] = {
             "type": "pix",
             "pix_key": pix_key,
@@ -54,21 +54,21 @@ class PIXToolkit(Toolkit):
             "status": "pending_confirmation"
         }
         
-        # Opcional: Validar a chave PIX antes de pedir confirmação para mostrar o recebedor
+        # Optional: Validate the PIX key before asking for confirmation to show the receiver
         try:
             receiver_info = await self.client.validate_pix_key(pix_key)
-            receiver_name = receiver_info.get("name", "Desconhecido")
+            receiver_name = receiver_info.get("name", "Unknown")
             masked_document = receiver_info.get("masked_document", "")
-            return (f"Operação PIX preparada. Recebedor: {receiver_name} ({masked_document}). "
-                    f"Valor: R$ {amount:.2f}. Por favor, peça ao usuário para confirmar a operação.")
+            return (f"PIX operation prepared. Receiver: {receiver_name} ({masked_document}). "
+                    f"Amount: R$ {amount:.2f}. Please ask the user to confirm the operation.")
         except Exception:
-            return (f"Operação PIX preparada para a chave {pix_key} no valor de R$ {amount:.2f}. "
-                    f"Por favor, peça ao usuário para confirmar a operação.")
+            return (f"PIX operation prepared for key {pix_key} in the amount of R$ {amount:.2f}. "
+                    f"Please ask the user to confirm the operation.")
 
     async def pix_schedule(self, run_context: RunContext, pix_key: str, amount: float, schedule_datetime: str, recurrence: str = "none") -> str:
         """
-        Prepara ou executa um agendamento de PIX.
-        Salva no estado aguardando confirmação.
+        Prepares or executes a PIX scheduling.
+        Saves in the state waiting for confirmation.
         """
         state = run_context.session_state
         pending = state.get("pending_operation")
@@ -81,7 +81,7 @@ class PIXToolkit(Toolkit):
                 "recurrence": pending.get("recurrence")
             })
             state["pending_operation"] = None
-            return f"Agendamento realizado com sucesso: {result}"
+            return f"Scheduling completed successfully: {result}"
 
         state["pending_operation"] = {
             "type": "pix_schedule",
@@ -91,29 +91,29 @@ class PIXToolkit(Toolkit):
             "recurrence": recurrence,
             "status": "pending_confirmation"
         }
-        return (f"Agendamento de PIX preparado para {schedule_datetime} no valor de R$ {amount:.2f}. "
-                f"Por favor, peça ao usuário para confirmar.")
+        return (f"PIX scheduling prepared for {schedule_datetime} in the amount of R$ {amount:.2f}. "
+                f"Please ask the user to confirm.")
 
     async def get_pix_keys(self) -> list:
-        """Lista chaves PIX registradas na conta."""
+        """Lists PIX keys registered in the account."""
         return await self.client.get_pix_keys()
 
     async def register_pix_key(self, key_type: str, key_value: str = "") -> dict:
-        """Registra nova chave PIX. key_type: cpf|cnpj|email|phone|random."""
+        """Registers a new PIX key. key_type: cpf|cnpj|email|phone|random."""
         return await self.client.register_pix_key(key_type, key_value)
 
     async def delete_pix_key(self, pix_key_id: str) -> dict:
-        """Remove chave PIX registrada pelo ID."""
+        """Removes a registered PIX key by ID."""
         return await self.client.delete_pix_key(pix_key_id)
 
     async def get_pix_limits(self) -> dict:
-        """Retorna os limites de transferência PIX (diurno e noturno)."""
+        """Returns PIX transfer limits (daytime and nighttime)."""
         return await self.client.get_pix_limits()
 
     async def update_pix_limit(self, new_limit_daytime: float, new_limit_nighttime: float) -> dict:
-        """Solicita alteração de limite PIX."""
+        """Requests a PIX limit change."""
         return await self.client.update_pix_limit(new_limit_daytime, new_limit_nighttime)
 
     async def get_pix_receipt(self, transaction_id: str) -> dict:
-        """Gera comprovante de transação PIX."""
+        """Generates PIX transaction receipt."""
         return await self.client.get_pix_receipt(transaction_id)

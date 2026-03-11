@@ -21,10 +21,17 @@ class ChatRequest(BaseModel):
     session_id: str | None = None
 
 
+class FileResponse(BaseModel):
+    content_type: str
+    content: str  # Base64
+    filename: str
+
+
 class ChatResponse(BaseModel):
     session_id: str
     message: str
     account_id: str
+    files: list[FileResponse] = []
 
 
 @router.post("", response_model=ChatResponse)
@@ -34,7 +41,7 @@ async def chat(
     jwt_token: str = Depends(extract_token),
 ):
     """
-    Send a message to the BancoBot AI agent.
+    Send a message to the BankBot AI agent.
 
     - JWT is verified by the agent (extracts user_id and account_id)
     - The same JWT is forwarded to all backend API calls
@@ -69,11 +76,18 @@ async def chat(
             agent.session_state["pending_operation"] = None
         if "last_query" not in agent.session_state:
             agent.session_state["last_query"] = None
+        if "files" not in agent.session_state:
+            agent.session_state["files"] = []
 
         response = await agent.arun(payload.message)
         answer = response.content if hasattr(response, "content") else str(response)
+        
+        # Extract and clear files from session state
+        files_to_send = agent.session_state.get("files", [])
+        agent.session_state["files"] = []
+        
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Erro no agente: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Agent error: {str(exc)}")
 
     # Persist lightweight metadata in Redis (TTL 30 min)
     session = await get_session(session_id)
@@ -84,6 +98,7 @@ async def chat(
         session_id=session_id,
         message=answer,
         account_id=account_id,
+        files=files_to_send
     )
 
 

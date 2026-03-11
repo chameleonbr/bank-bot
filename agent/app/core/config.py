@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     REDIS_URL: str = "redis://localhost:6379/0"
     OPENAI_API_KEY: str = ""
+    OPENROUTER_API_KEY: str = ""
     ENVIRONMENT: str = "development"
 
     model_config = {"env_file": str(_ENV_FILE), "extra": "ignore"}
@@ -22,3 +23,5 @@ settings = Settings()
 # Sync critical keys into os.environ so third-party libs (e.g. agno/openai) can find them
 if settings.OPENAI_API_KEY:
     os.environ.setdefault("OPENAI_API_KEY", settings.OPENAI_API_KEY)
+if settings.OPENROUTER_API_KEY:
+    os.environ.setdefault("OPENROUTER_API_KEY", settings.OPENROUTER_API_KEY)

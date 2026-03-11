@@ -21,12 +21,13 @@ router = APIRouter(prefix="/banking", tags=["banking"])
 def _get_account(account_id: str, db: Session) -> Account:
     acc = db.get(Account, account_id)
     if not acc:
-        raise HTTPException(status_code=404, detail="Conta não encontrada")
+        raise HTTPException(status_code=404, detail="Account not found")
     return acc
 
 
 @router.get("/balance", response_model=BalanceResponse)
 def get_balance(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns available, savings, and salary balance for the authenticated user."""
     acc = _get_account(current_user["account_id"], db)
     total = acc.balance_checking + acc.balance_savings + acc.balance_salary
     return BalanceResponse(
@@ -42,6 +43,7 @@ def get_balance(current_user: dict = Depends(get_current_user), db: Session = De
 
 @router.get("/account-info", response_model=AccountInfoResponse)
 def get_account_info(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns registration and account details."""
     acc = _get_account(current_user["account_id"], db)
     return AccountInfoResponse.model_validate(acc)
 
@@ -55,6 +57,7 @@ def get_statement(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Fetches the account statement by period with optional category filters."""
     acc_id = current_user["account_id"]
     q = db.query(Transaction).filter(Transaction.account_id == acc_id)
     if start_date:
@@ -76,12 +79,37 @@ def get_statement(
     )
 
 
+@router.get("/generate-statement-pdf")
+def generate_statement_pdf(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Generates a mock PDF statement in base64."""
+    # Real implementation would use fpdf or similar to generate a PDF and convert to base64
+    # Mocking base64 content for a PDF
+    mock_pdf_base64 = (
+        "JVBERi0xLjQKJfbk/N8KMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqC"
+        "jIgMCBvYmoKPDAKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPj4KZW5kb2JqCjMgMCBvYmoKPD"
+        "AKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovTWVkaWFCb3ggWzAgMCA1OTUgODQyXQovUmVzb3VyY2VzIDw"
+        "8Ci9Gb250IDw8Ci9GMSA0IDAgUgo+Pgo+PgovQ29udGVudHMgNSAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPD"
+        "AKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iago1IDAg"
+        "b2JqCjw8Ci9MZW5ndGggNDQKPj4Kc3RyZWFtCkJUCi9GMSAxMiBUZgoxMDAgNzAwIFREClsoQmFua0JvdCBTdGF0ZW1lbnQgUERGIFNhbXBsZSldIFRKCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDYKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDE4IDAwMDAwIG4gCjAwMDAwMDAwNzcgMDAwMDAgbiAKMDAwMDAwMDE0NCAwMDAwMCBuIAowMDAwMDAwMjg1IDAwMDAwIG4gCjAwMDAwMDAzNzcgMDAwMDAgbiAKdHJhaWxlcgo8PAovU2l6ZSA2Ci9Sb290IDEgMCBSCj4+CnN0YXJ0eHJlZgo0NzAKJSVFT0YK"
+    )
+    return {
+        "content_type": "application/pdf",
+        "content": mock_pdf_base64,
+        "filename": f"statement_{start_date}_to_{end_date}.pdf" if start_date and end_date else "statement.pdf"
+    }
+
+
 @router.get("/contacts", response_model=list[ContactOut])
 def list_contacts(
     search: Optional[str] = Query(None),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Lists saved contacts for the user."""
     q = db.query(Contact).filter(Contact.account_id == current_user["account_id"])
     if search:
         q = q.filter(Contact.name.ilike(f"%{search}%"))
@@ -94,6 +122,7 @@ def add_contact(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Adds a new contact."""
     contact = Contact(
         id=f"CON{uuid.uuid4().hex[:6].upper()}",
         account_id=current_user["account_id"],
@@ -111,12 +140,13 @@ def remove_contact(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Removes a contact."""
     contact = db.query(Contact).filter(
         Contact.id == contact_id,
         Contact.account_id == current_user["account_id"],
     ).first()
     if not contact:
-        raise HTTPException(status_code=404, detail="Contato não encontrado")
+        raise HTTPException(status_code=404, detail="Contact not found")
     db.delete(contact)
     db.commit()
 
@@ -128,6 +158,7 @@ def get_scheduled(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Lists scheduled operations."""
     q = db.query(ScheduledOperation).filter(
         ScheduledOperation.account_id == current_user["account_id"],
         ScheduledOperation.status == "scheduled",
@@ -145,11 +176,12 @@ def cancel_scheduled(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Cancels a scheduled operation."""
     op = db.query(ScheduledOperation).filter(
         ScheduledOperation.id == schedule_id,
         ScheduledOperation.account_id == current_user["account_id"],
     ).first()
     if not op:
-        raise HTTPException(status_code=404, detail="Agendamento não encontrado")
+        raise HTTPException(status_code=404, detail="Scheduling not found")
     op.status = "cancelled"
     db.commit()

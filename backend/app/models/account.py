@@ -23,6 +23,10 @@ class Account(Base):
     branch_address = Column(String, default="")
     branch_phone = Column(String, default="")
 
+    @property
+    def account_id(self) -> str:
+        return self.id
+
     user = relationship("User", back_populates="account", uselist=False)
     transactions = relationship("Transaction", back_populates="account")
     contacts = relationship("Contact", back_populates="account")

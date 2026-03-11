@@ -32,7 +32,7 @@ _TED_DIRECTORY = {
 def _get_account(account_id: str, db: Session) -> Account:
     acc = db.get(Account, account_id)
     if not acc:
-        raise HTTPException(status_code=404, detail="Conta não encontrada")
+        raise HTTPException(status_code=404, detail="Account not found")
     return acc
 
 
@@ -55,23 +55,23 @@ def ted_transfer(
     if not (_TED_OPEN_HOUR <= now.hour < _TED_CLOSE_HOUR) or now.weekday() >= 5:
         raise HTTPException(
             status_code=422,
-            detail=f"TED disponível apenas em dias úteis entre {_TED_OPEN_HOUR}h e {_TED_CLOSE_HOUR}h.",
+            detail=f"TED is only available on business days between {_TED_OPEN_HOUR}h and {_TED_CLOSE_HOUR}h.",
         )
     acc = _get_account(current_user["account_id"], db)
     if acc.balance_checking < payload.amount:
-        raise HTTPException(status_code=422, detail="Saldo insuficiente")
+        raise HTTPException(status_code=422, detail="Insufficient balance")
     acc.balance_checking -= payload.amount
     bank = next((b for b in MOCK_BANKS if b["code"] == payload.bank_code), {"short_name": payload.bank_code})
     txn_id = f"TRX{uuid.uuid4().hex[:8].upper()}"
     db.add(Transaction(
         id=txn_id, account_id=acc.id,
-        description=f"TED enviado - {bank['short_name']} Ag.{payload.agency}",
-        amount=-payload.amount, category="transferencia", type="ted",
+        description=f"TED sent - {bank['short_name']} Br.{payload.agency}",
+        amount=-payload.amount, category="transfer", type="ted",
         counterpart_name="", counterpart_key="",
         receipt_id=f"RCP{uuid.uuid4().hex[:6].upper()}", status="completed",
     ))
     db.commit()
-    return TransferResponse(transaction_id=txn_id, status="completed", message="TED enviada com sucesso!", timestamp=now)
+    return TransferResponse(transaction_id=txn_id, status="completed", message="TED sent successfully!", timestamp=now)
 
 
 @router.post("/schedule", status_code=201)
@@ -92,7 +92,7 @@ def ted_schedule(
     )
     db.add(op)
     db.commit()
-    return {"schedule_id": op.id, "status": "scheduled", "message": "TED agendada com sucesso!"}
+    return {"schedule_id": op.id, "status": "scheduled", "message": "TED scheduled successfully!"}
 
 
 @router.get("/receipt/{transaction_id}")
@@ -107,7 +107,7 @@ def get_ted_receipt(
         Transaction.type == "ted",
     ).first()
     if not txn:
-        raise HTTPException(status_code=404, detail="Comprovante não encontrado")
+        raise HTTPException(status_code=404, detail="Receipt not found")
     acc = db.get(Account, current_user["account_id"])
     return {
         "transaction_id": txn.id, "date": txn.date, "amount": abs(txn.amount),

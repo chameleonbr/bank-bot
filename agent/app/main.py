@@ -4,8 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.chat import router as chat_router
 
 app = FastAPI(
-    title="BancoBot AI — Agent",
-    description="Agente de IA bancário com Agno Framework para o FinBank S.A.",
+    title="BankBot AI — Agent",
+    description="Banking AI Agent powered by Agno Framework for FinBank S.A.",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",

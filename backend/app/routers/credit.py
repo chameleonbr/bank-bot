@@ -19,7 +19,7 @@ from app.schemas.credit import (
 router = APIRouter(prefix="/credit", tags=["credit"])
 
 _SCORE_CLASSIFICATION = [
-    (620, "Baixo"), (700, "Regular"), (750, "Bom"), (820, "Ótimo"), (float("inf"), "Excelente")
+    (620, "Low"), (700, "Regular"), (750, "Good"), (820, "Great"), (float("inf"), "Excellent")
 ]
 
 LOAN_RATES = {"pessoal": 0.0199, "consignado": 0.0114, "empresarial": 0.0149}
@@ -29,7 +29,7 @@ FINANCING_RATES = {"imovel": 0.0075, "veiculo": 0.0099, "rural": 0.0089}
 def _get_account(account_id: str, db: Session) -> Account:
     acc = db.get(Account, account_id)
     if not acc:
-        raise HTTPException(status_code=404, detail="Conta não encontrada")
+        raise HTTPException(status_code=404, detail="Account not found")
     return acc
 
 
@@ -42,6 +42,7 @@ def _pmt(principal: float, rate: float, n: int) -> float:
 
 @router.get("/limit", response_model=CreditLimitOut)
 def get_credit_limit(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns the user's total, used, and available credit limit."""
     acc = _get_account(current_user["account_id"], db)
     total = acc.credit_score * 50  # simple formula
     used = sum(l.outstanding_balance for l in acc.loans if l.status == "active")
@@ -50,6 +51,7 @@ def get_credit_limit(current_user: dict = Depends(get_current_user), db: Session
 
 @router.post("/simulate-loan", response_model=SimulateLoanResponse)
 def simulate_loan(payload: SimulateLoanRequest, current_user: dict = Depends(get_current_user)):
+    """Simulates a loan with installments and specific rates."""
     rate = LOAN_RATES.get(payload.loan_type, 0.0199)
     installment = _pmt(payload.amount, rate, payload.num_installments)
     total = installment * payload.num_installments
@@ -71,6 +73,7 @@ def request_loan(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Submits a loan request for analysis."""
     acc = _get_account(current_user["account_id"], db)
     rate = LOAN_RATES.get(payload.loan_type, 0.0199)
     installment = _pmt(payload.amount, rate, payload.num_installments)
@@ -85,11 +88,12 @@ def request_loan(
     )
     db.add(loan)
     db.commit()
-    return {"loan_id": loan.id, "status": "analysis", "message": "Solicitação enviada. Você receberá resposta em até 1 dia útil."}
+    return {"loan_id": loan.id, "status": "analysis", "message": "Request sent. You will receive a response within 1 business day."}
 
 
 @router.get("/loans", response_model=list[LoanOut])
 def list_active_loans(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Lists all active loans for the user."""
     loans = db.query(Loan).filter(
         Loan.account_id == current_user["account_id"], Loan.status == "active"
     ).all()
@@ -98,17 +102,19 @@ def list_active_loans(current_user: dict = Depends(get_current_user), db: Sessio
 
 @router.get("/loan-status/{loan_id}")
 def get_loan_status(loan_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns the status of a specific loan request."""
     loan = db.query(Loan).filter(Loan.id == loan_id, Loan.account_id == current_user["account_id"]).first()
     if not loan:
-        raise HTTPException(status_code=404, detail="Empréstimo não encontrado")
+        raise HTTPException(status_code=404, detail="Loan not found")
     return {"loan_id": loan.id, "status": loan.status, "type": loan.loan_type, "amount": loan.requested_amount}
 
 
 @router.get("/loans/{loan_id}/statement")
 def get_loan_statement(loan_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns a detailed statement of installments and balance for a loan."""
     loan = db.query(Loan).filter(Loan.id == loan_id, Loan.account_id == current_user["account_id"]).first()
     if not loan:
-        raise HTTPException(status_code=404, detail="Empréstimo não encontrado")
+        raise HTTPException(status_code=404, detail="Loan not found")
     return {
         "loan_id": loan.id, "type": loan.loan_type,
         "requested_amount": loan.requested_amount, "outstanding_balance": loan.outstanding_balance,
@@ -119,9 +125,10 @@ def get_loan_statement(loan_id: str, current_user: dict = Depends(get_current_us
 
 @router.post("/anticipate", response_model=AnticipateResponse)
 def anticipate_installments(payload: AnticipateRequest, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Simulates or calculates the discount for anticipating loan installments."""
     loan = db.query(Loan).filter(Loan.id == payload.loan_id, Loan.account_id == current_user["account_id"], Loan.status == "active").first()
     if not loan:
-        raise HTTPException(status_code=404, detail="Empréstimo não encontrado")
+        raise HTTPException(status_code=404, detail="Loan not found")
     original = round(loan.installment_amount * payload.num_installments_to_anticipate, 2)
     discount_rate = 0.005 * payload.num_installments_to_anticipate
     discount = round(original * min(discount_rate, 0.15), 2)
@@ -135,6 +142,7 @@ def anticipate_installments(payload: AnticipateRequest, current_user: dict = Dep
 
 @router.get("/score", response_model=CreditScoreOut)
 def get_credit_score(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns the user's credit score and classification."""
     acc = _get_account(current_user["account_id"], db)
     score = int(acc.credit_score)
     classification = next(c for threshold, c in _SCORE_CLASSIFICATION if score <= threshold)
@@ -145,6 +153,7 @@ def get_credit_score(current_user: dict = Depends(get_current_user), db: Session
 
 @router.post("/simulate-financing", response_model=SimulateFinancingResponse)
 def simulate_financing(payload: SimulateFinancingRequest, _: dict = Depends(get_current_user)):
+    """Simulates asset financing (Price or SAC systems)."""
     financed = payload.amount - payload.entry_value
     rate = FINANCING_RATES.get(payload.modality, 0.0085)
     first = _pmt(financed, rate, payload.period_months)
@@ -161,15 +170,17 @@ def simulate_financing(payload: SimulateFinancingRequest, _: dict = Depends(get_
 
 @router.get("/financings", response_model=list[FinancingOut])
 def list_active_financings(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Lists all active financing contracts for the user."""
     fins = db.query(Financing).filter(Financing.account_id == current_user["account_id"], Financing.status == "active").all()
     return [FinancingOut.model_validate(f) for f in fins]
 
 
 @router.get("/financings/{financing_id}/next-installment", response_model=NextInstallmentOut)
 def get_next_installment(financing_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns details of the next financing installment due."""
     fin = db.query(Financing).filter(Financing.id == financing_id, Financing.account_id == current_user["account_id"]).first()
     if not fin:
-        raise HTTPException(status_code=404, detail="Financiamento não encontrado")
+        raise HTTPException(status_code=404, detail="Financing not found")
     return NextInstallmentOut(
         financing_id=fin.id, due_date=fin.next_due_date,
         amount=fin.installment_amount,
@@ -180,9 +191,10 @@ def get_next_installment(financing_id: str, current_user: dict = Depends(get_cur
 
 @router.get("/financings/{financing_id}/statement")
 def get_financing_statement(financing_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns a statement for a specific financing contract."""
     fin = db.query(Financing).filter(Financing.id == financing_id, Financing.account_id == current_user["account_id"]).first()
     if not fin:
-        raise HTTPException(status_code=404, detail="Financiamento não encontrado")
+        raise HTTPException(status_code=404, detail="Financing not found")
     return {
         "financing_id": fin.id, "modality": fin.modality, "asset_value": fin.asset_value,
         "financed_amount": fin.financed_amount, "outstanding_balance": fin.outstanding_balance,
@@ -197,6 +209,7 @@ def request_financing(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Submits a financing request."""
     acc = _get_account(current_user["account_id"], db)
     rate = FINANCING_RATES.get(payload.modality, 0.0085)
     financed = payload.amount - payload.entry_value
@@ -214,12 +227,12 @@ def request_financing(
     )
     db.add(fin)
     db.commit()
-    return {"financing_id": fin.id, "status": "analysis", "message": "Solicitação de financiamento registrada. Retorno em até 3 dias úteis."}
+    return {"financing_id": fin.id, "status": "analysis", "message": "Financing request registered. You will receive a response within 3 business days."}
 
 
 @router.post("/financings/{financing_id}/portability")
 def request_portability(financing_id: str, target_bank_code: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     fin = db.query(Financing).filter(Financing.id == financing_id, Financing.account_id == current_user["account_id"]).first()
     if not fin:
-        raise HTTPException(status_code=404, detail="Financiamento não encontrado")
-    return {"financing_id": fin.id, "target_bank_code": target_bank_code, "status": "requested", "message": "Pedido de portabilidade registrado. Documentação será solicitada via e-mail em até 2 dias úteis."}
+        raise HTTPException(status_code=404, detail="Financing not found")
+    return {"financing_id": fin.id, "target_bank_code": target_bank_code, "status": "requested", "message": "Portability request registered. Documentation will be requested via email within 2 business days."}

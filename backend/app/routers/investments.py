@@ -21,16 +21,16 @@ CDI_AA = 0.105  # 10.5% a.a. fictício
 IR_BRACKETS = [(180, 0.225), (360, 0.20), (720, 0.175), (float("inf"), 0.15)]
 
 _PROFILE_DESCRIPTIONS = {
-    "conservador": "Prefere segurança e previsibilidade, aceita rentabilidades menores para preservar capital.",
-    "moderado": "Equilibra segurança e rentabilidade, aceita riscos controlados em busca de maior retorno.",
-    "arrojado": "Busca máxima rentabilidade, aceita volatilidade e riscos mais elevados.",
+    "conservador": "Prefers safety and predictability, accepts lower returns to preserve capital.",
+    "moderado": "Balances safety and profitability, accepts controlled risks in search of higher return.",
+    "arrojado": "Seeks maximum profitability, accepts volatility and higher risks.",
 }
 
 
 def _get_account(account_id: str, db: Session) -> Account:
     acc = db.get(Account, account_id)
     if not acc:
-        raise HTTPException(status_code=404, detail="Conta não encontrada")
+        raise HTTPException(status_code=404, detail="Account not found")
     return acc
 
 
@@ -56,6 +56,7 @@ def _simulate(amount: float, period_days: float, rate_str: str) -> tuple[float, 
 
 @router.get("/portfolio", response_model=PortfolioResponse)
 def get_portfolio(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns the user's current investment portfolio and performance."""
     _get_account(current_user["account_id"], db)
     investments = db.query(Investment).filter(
         Investment.account_id == current_user["account_id"],
@@ -86,6 +87,7 @@ def list_available_products(
     min_amount: Optional[float] = Query(None),
     _: dict = Depends(get_current_user),
 ):
+    """Lists available investment products with filtering."""
     products = AVAILABLE_PRODUCTS
     if risk_profile:
         products = [p for p in products if p["risk_profile"] == risk_profile]
@@ -96,17 +98,19 @@ def list_available_products(
 
 @router.get("/products/{product_id}", response_model=ProductOut)
 def get_product_info(product_id: str, _: dict = Depends(get_current_user)):
+    """Returns details about a specific investment product."""
     prod = next((p for p in AVAILABLE_PRODUCTS if p["id"] == product_id), None)
     if not prod:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Product not found")
     return ProductOut(**prod)
 
 
 @router.post("/simulate", response_model=SimulateInvestmentResponse)
 def simulate_investment(payload: SimulateInvestmentRequest, _: dict = Depends(get_current_user)):
+    """Simulates returns for an investment product over a period."""
     prod = next((p for p in AVAILABLE_PRODUCTS if p["id"] == payload.product_id), None)
     if not prod:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Product not found")
     gross, final = _simulate(payload.amount, payload.period_days, prod["rate"])
     ir = _calculate_ir(payload.period_days, gross) if not prod["is_ir_exempt"] else 0.0
     net = round(gross - ir, 2)
@@ -123,12 +127,13 @@ def invest(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Executes a new investment."""
     acc = _get_account(current_user["account_id"], db)
     prod = next((p for p in AVAILABLE_PRODUCTS if p["id"] == payload.product_id), None)
     if not prod:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Product not found")
     if acc.balance_checking < payload.amount:
-        raise HTTPException(status_code=422, detail="Saldo insuficiente")
+        raise HTTPException(status_code=422, detail="Insufficient balance")
     acc.balance_checking -= payload.amount
     inv = Investment(
         id=f"INV{uuid.uuid4().hex[:6].upper()}",
@@ -140,7 +145,7 @@ def invest(
     )
     db.add(inv)
     db.commit()
-    return {"investment_id": inv.id, "status": "active", "message": f"Aplicação de R$ {payload.amount:.2f} em {prod['name']} realizada com sucesso!"}
+    return {"investment_id": inv.id, "status": "active", "message": f"Investment of R$ {payload.amount:.2f} in {prod['name']} performed successfully!"}
 
 
 @router.post("/redeem")
@@ -149,27 +154,29 @@ def redeem(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    """Redeems an investment (partial or total)."""
     inv = db.query(Investment).filter(
         Investment.id == payload.investment_id,
         Investment.account_id == current_user["account_id"],
         Investment.status == "active",
     ).first()
     if not inv:
-        raise HTTPException(status_code=404, detail="Investimento não encontrado")
+        raise HTTPException(status_code=404, detail="Investment not found")
     amount = payload.amount or inv.current_value
     if amount > inv.current_value:
-        raise HTTPException(status_code=422, detail="Valor de resgate superior ao disponível")
+        raise HTTPException(status_code=422, detail="Redemption value exceeds available balance")
     acc = _get_account(current_user["account_id"], db)
     acc.balance_checking += amount
     inv.current_value -= amount
     if inv.current_value <= 0:
         inv.status = "redeemed"
     db.commit()
-    return {"status": "success", "amount_credited": amount, "message": f"Resgate de R$ {amount:.2f} creditado na conta corrente."}
+    return {"status": "success", "amount_credited": amount, "message": f"Redemption of R$ {amount:.2f} credited to checking account."}
 
 
 @router.get("/profile", response_model=InvestorProfileOut)
 def get_investor_profile(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns the user's investor risk profile."""
     acc = _get_account(current_user["account_id"], db)
     return InvestorProfileOut(
         account_id=acc.id, profile=acc.investor_profile,
@@ -179,6 +186,7 @@ def get_investor_profile(current_user: dict = Depends(get_current_user), db: Ses
 
 @router.get("/income-report/{year}", response_model=IncomeReportOut)
 def get_income_report(year: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Generates an annual income report for tax purposes."""
     investments = db.query(Investment).filter(Investment.account_id == current_user["account_id"]).all()
     products = []
     total_gross = total_ir = 0.0
