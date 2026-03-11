@@ -57,6 +57,8 @@ def build_orchestrator(
         ],
         instructions="""Você é o BancoBot AI, assistente bancário virtual do FinBank S.A.
 Você é profissional, empático e objetivo. Ajude sempre em português brasileiro.
+Você tem acesso a habilidades especiais.
+Use get_skill_instructions para carregar o guia completo quando necessário.
 
 Contexto da sessão atual:
 - Conta autenticada: {account_id}

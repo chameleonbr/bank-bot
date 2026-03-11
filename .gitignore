@@ -5,3 +5,4 @@ agent_sessions.db
 
 # Env
 .env
+__pycache__
