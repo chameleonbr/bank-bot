@@ -17,7 +17,7 @@ class BankingToolkit(Toolkit):
         self.register(self.remove_contact)
         self.register(self.get_scheduled)
         self.register(self.cancel_scheduled)
-        self.register(self.generate_statement_pdf)
+        self.register(self.get_statement_pdf)
 
     async def get_balance(self) -> dict:
         """Returns the available, blocked, and total balance for the authenticated account."""
@@ -59,7 +59,7 @@ class BankingToolkit(Toolkit):
         """Cancels a scheduled operation by schedule_id."""
         return await self.client.cancel_scheduled(schedule_id)
 
-    async def generate_statement_pdf(self, run_context: RunContext, start_date: str = "", end_date: str = "") -> str:
+    async def get_statement_pdf(self, run_context: RunContext, start_date: str = "", end_date: str = "") -> str:
         """Generates a PDF statement for the period and attaches it to the response."""
         try:
             file_data = await self.client.generate_statement_pdf(start_date, end_date)

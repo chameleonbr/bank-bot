@@ -1,0 +1,56 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Backend (Debug)",
+            "type": "python",
+            "request": "launch",
+            "module": "uvicorn",
+            "python": "${workspaceFolder}/backend/.venv/bin/python",
+            "cwd": "${workspaceFolder}/backend",
+            "args": [
+                "app.main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--reload"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/backend"
+            },
+            "jinja": true,
+            "justMyCode": false
+        },
+        {
+            "name": "Agent (Debug)",
+            "type": "python",
+            "request": "launch",
+            "module": "uvicorn",
+            "python": "${workspaceFolder}/agent/.venv/bin/python",
+            "cwd": "${workspaceFolder}/agent",
+            "args": [
+                "app.main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8001",
+                "--reload"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/agent"
+            },
+            "jinja": true,
+            "justMyCode": false
+        }
+    ],
+    "compounds": [
+        {
+            "name": "BancoBot (All)",
+            "configurations": [
+                "Backend (Debug)",
+                "Agent (Debug)"
+            ]
+        }
+    ]
+}

@@ -12,12 +12,24 @@ bearer_scheme = HTTPBearer()
 def decode_token(token: str) -> dict:
     """Decode and validate JWT, returning the payload."""
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        # Add leeway to compensate for clock skew or debugger pauses
+        payload = jwt.decode(
+            token, 
+            settings.SECRET_KEY, 
+            algorithms=[settings.ALGORITHM],
+            options={"leeway": 60}
+        )
         return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expirado",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido ou expirado",
+            detail="Token inválido",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

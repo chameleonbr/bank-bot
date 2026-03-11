@@ -61,7 +61,7 @@ async def chat(
     try:
         # Explicitly load session_state since it might not be auto-loaded
         try:
-            db_state = agent.get_session_state()
+            db_state = agent.get_session_data()
             if db_state:
                 agent.session_state = db_state
         except Exception:
@@ -84,7 +84,12 @@ async def chat(
         
         # Extract and clear files from session state
         files_to_send = agent.session_state.get("files", [])
-        agent.session_state["files"] = []
+
+        # debug session state
+        print("Session state:", agent.session_state)
+        print("agent")
+
+        #agent.session_state["files"] = []
         
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Agent error: {str(exc)}")
