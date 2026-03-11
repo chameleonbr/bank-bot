@@ -1,0 +1,21 @@
+INFO:     Started server process [20834]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+✅  Mock data seeded successfully.
+INFO:     127.0.0.1:45086 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45102 - "GET /banking/account-info HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59330 - "GET /banking/account-info HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58594 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54158 - "GET /banking/statement?start_date=2026-02-10&end_date=2026-03-11&limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58926 - "GET /credit/financings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49068 - "GET /credit/loans HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40992 - "GET /credit/loans HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45322 - "GET /credit/loans HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52770 - "GET /credit/loans HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52772 - "GET /credit/financings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39158 - "GET /credit/loans HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [20834]
