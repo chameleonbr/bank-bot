@@ -3,6 +3,9 @@ Chat API endpoint.
 POST /chat — receives user message + JWT, returns agent response.
 Agno session state is persisted in SQLite (via SqliteDb).
 Redis is retained for lightweight session metadata (account_id, last message).
+
+The agent is initialized once at startup via AgentManager.
+Each request only updates the session_id and JWT token.
 """
 
 import uuid
@@ -11,7 +14,7 @@ from pydantic import BaseModel
 
 from app.core.security import get_current_user, extract_token
 from app.core.redis_client import get_session, set_session
-from app.agents.orchestrator import build_orchestrator
+from app.core.agent_manager import agent_manager
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -48,27 +51,28 @@ async def chat(
     - The same JWT is forwarded to all backend API calls
     - Agno session state is persisted in SQLite and keyed by session_id
     - Redis stores lightweight metadata (account_id, last_message) for 30 min
+    - Agent is reused from AgentManager (initialized once at startup)
     """
     account_id = current_user.get("account_id")
     session_id = payload.session_id or str(uuid.uuid4())
 
-    # Build agent with user's JWT and session context for agno session_state
-    agent = build_orchestrator(
-        jwt_token=jwt_token,
-        session_id=session_id,
-        account_id=account_id,
-    )
-
     try:
-        response = await agent.arun(payload.message)
+        # Use the singleton agent manager - only session_id and JWT change per request
+        response = await agent_manager.run(
+            message=payload.message,
+            jwt_token=jwt_token,
+            session_id=session_id,
+            account_id=account_id,
+        )
+
         answer = response.content if hasattr(response, "content") else str(response)
-        
+
         # Extract and clear files from session state
         files_to_send = response.session_state.get("files", [])
         tools_called = [tool.tool_name for tool in response.tools]
 
         response.session_state["files"] = []
-        
+
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Agent error: {str(exc)}")
 

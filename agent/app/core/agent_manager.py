@@ -1,16 +1,12 @@
 """
-OrchestratorAgent — Routes user messages to the appropriate domain agent.
-Uses IntentClassificationSkill and ContextRetentionSkill.
-
-DEPRECATED: This file is kept for reference only.
-The agent is now initialized once at startup via AgentManager (app.core.agent_manager).
-Use agent_manager.run() instead of build_orchestrator().
+AgentManager — Singleton that initializes the Agno agent once at startup.
+Instead of creating a new agent per request, we reuse the same agent instance
+and only update the session_id for each conversation.
 """
 
 from pathlib import Path
 from agno.agent import Agent
 from agno.db.sqlite import SqliteDb
-from agno.models.openai import OpenAIChat
 from agno.models.openrouter import OpenRouter
 from agno.skills import Skills, LocalSkills
 
@@ -24,45 +20,56 @@ from app.toolkits.support_toolkit import SupportToolkit
 from app.toolkits.session_toolkit import SessionStateToolkit
 from app.client.backend_client import BackendClient
 
-# SQLite DB for agno session state persistence
-_DB_FILE = Path(__file__).resolve().parents[2] / "agent_sessions.db"
 
+class AgentManager:
+    """
+    Singleton manager for the Agno agent.
 
-def build_orchestrator(
-    jwt_token: str,
-    session_id: str | None = None,
-    account_id: str | None = None,
-) -> Agent:
-    """Build the OrchestratorAgent with all domain toolkits registered."""
-    client = BackendClient(jwt_token)
-    skills_dir = Path(__file__).parent.parent / "skills"
+    The agent is initialized once at application startup with all toolkits
+    and configuration. For each request, we only need to:
+    1. Update the BackendClient JWT token
+    2. Set the session_id before running
+    """
 
-    return Agent(
-        name="OrchestratorAgent",
-        model=OpenRouter(id="google/gemini-3.1-flash-lite-preview"),
-        # Agno SQLite-backed session state — persists across turns in the same session
-        db=SqliteDb(db_file=str(_DB_FILE)),
-        session_id=session_id,
-        add_datetime_to_context=True,
-        add_history_to_context=True,
-        num_history_runs=5,
-        debug_mode=True,
-        # Initial state (populated only on first turn; subsequent turns load from DB)
-        # Note: we shouldn't pass session_state here if we want to load from DB, or we must ensure it doesn't overwrite.
-        # Agno's `session_state` gets merged or overwritten. We will let the tools populate it.
-        add_session_state_to_context=False,
-        skills=Skills(loaders=[LocalSkills(str(skills_dir))]),
-        tools=[
-            BankingToolkit(client),
-            PIXToolkit(client),
-            TEDToolkit(client),
-            InvestmentToolkit(client),
-            CreditToolkit(client),
-            LoanToolkit(client),
-            SupportToolkit(client),
-            SessionStateToolkit(),
-        ],
-        instructions="""You are BankBot AI, the virtual banking assistant for FinBank S.A.
+    _instance: "AgentManager | None" = None
+    _agent: Agent | None = None
+    _db_file: Path = Path(__file__).resolve().parents[2] / "agent_sessions.db"
+    _skills_dir: Path = Path(__file__).parent.parent / "skills"
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def initialize(self):
+        """Initialize the agent once at application startup."""
+        if self._agent is not None:
+            return  # Already initialized
+
+        # Create a dummy client for initialization (will be replaced per request)
+        dummy_client = BackendClient("dummy_token")
+
+        self._agent = Agent(
+            name="OrchestratorAgent",
+            model=OpenRouter(id="google/gemini-3.1-flash-lite-preview"),
+            db=SqliteDb(db_file=str(self._db_file)),
+            add_datetime_to_context=True,
+            add_history_to_context=True,
+            num_history_runs=5,
+            debug_mode=True,
+            add_session_state_to_context=False,
+            skills=Skills(loaders=[LocalSkills(str(self._skills_dir))]),
+            tools=[
+                BankingToolkit(dummy_client),
+                PIXToolkit(dummy_client),
+                TEDToolkit(dummy_client),
+                InvestmentToolkit(dummy_client),
+                CreditToolkit(dummy_client),
+                LoanToolkit(dummy_client),
+                SupportToolkit(dummy_client),
+                SessionStateToolkit(),
+            ],
+            instructions="""You are BankBot AI, the virtual banking assistant for FinBank S.A.
 You are professional, empathetic, and objective. Always help in Brazilian Portuguese.
 You have access to special skills.
 Use get_skill_instructions to load the full guide when necessary.
@@ -158,5 +165,56 @@ User: "Automate welcome emails for new customers."
 
 </skills_usage_enforcement>
 """,
-        markdown=True,
-    )
+            markdown=True,
+        )
+
+    def _update_toolkit_clients(self, jwt_token: str):
+        """Update the JWT token for all backend-dependent toolkits."""
+        new_client = BackendClient(jwt_token)
+
+        # Update client for all toolkits that depend on BackendClient
+        for tool in self._agent.tools:
+            if hasattr(tool, 'client') and isinstance(tool.client, BackendClient):
+                tool.client = new_client
+
+    async def run(
+        self,
+        message: str,
+        jwt_token: str,
+        session_id: str,
+        account_id: str | None = None,
+    ):
+        """
+        Run the agent with a new message.
+
+        This method:
+        1. Updates the BackendClient JWT token for all toolkits
+        2. Sets the session_id for this conversation
+        3. Runs the agent with the message
+
+        Args:
+            message: User's message
+            jwt_token: JWT token for backend authentication
+            session_id: Session ID for conversation state
+            account_id: Optional account ID for context
+
+        Returns:
+            Agent response
+        """
+        if self._agent is None:
+            raise RuntimeError("Agent not initialized. Call initialize() first.")
+
+        # Update JWT token for all backend toolkits
+        self._update_toolkit_clients(jwt_token)
+
+        # Set session_id for this run (Agno will load state from DB)
+        self._agent.session_id = session_id
+
+        # Run the agent
+        response = await self._agent.arun(message)
+
+        return response
+
+
+# Global singleton instance
+agent_manager = AgentManager()
